@@ -1,7 +1,11 @@
-import React, { useRef } from "react";
+import { useRef,  useEffect, useState } from "react";
 import Card from "./Card";
+import LogOutButton from "../components/LogOutButton";
+import AddTaskButton from "./AddTaskButton";
+import {collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db,auth } from "../firebase"; // Adjust the import path as necessary
 
-const Foreground = () => {
+const Foreground = ({user}) => {
   const ref = useRef(null);
   const data = [
     {
@@ -41,14 +45,41 @@ const Foreground = () => {
       tag: { isOpen: true, tagTitle: "Upload", tagColor: "green" },
     },
   ];
+  const authuser = auth.currentUser;// getting the auth user from the login user
+  const constraintsRef = useRef(null);
+  const [cards, setCards] = useState([]);
+
+  
+  useEffect(() => {
+    if (!authuser) return;
+    const filesRef = collection(db, "users", authuser.uid, "files");
+    const q = query(filesRef, orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => { // Firebase default function to detect changes in realtime like socket.io
+      const docs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setCards(docs);  //data save dynmically in the cards state like  you use as data array 
+    });
+
+    return () => unsubscribe(); // ✅ Cleanup
+  }, [authuser]); // only run once when authuser is available
+
+
   return (
-    <div
-      ref={ref}
-      className="fixed top-0 left-0 z-[3] w-full h-full flex gap-5 flex-wrap p-5"
-    >
-      {data.map((item, index) => (
-        <Card data={item} reference={ref} />
+    <div ref={constraintsRef} className="fixed top-0 left-0 z-[3] w-full h-full flex gap-5 flex-wrap p-5">
+      <AddTaskButton />  {/* Button to add new card,  on click it will crate a empty card  */}
+
+      {cards.map((item) => (
+        <Card
+          key={item.id}
+          data={item}
+          user={user}
+          reference={constraintsRef}
+        />
       ))}
+
+      <LogOutButton reference={constraintsRef} user={user} />
     </div>
   );
 };
